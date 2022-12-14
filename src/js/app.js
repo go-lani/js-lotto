@@ -1,13 +1,9 @@
 import {
-  isValidAmountUnit,
+  checkValidAmountUnit,
   isValidClickEventTarget,
   isValidSubmitEventTarget,
+  ValidationError,
 } from "./utils.js";
-import {
-  MESSAGE_ABOUT_DUPLICATION_NUMBER,
-  MESSAGE_ABOUT_ENTERED_OUTSTANDING_AMOUNT,
-  MESSAGE_ABOUT_UNIT_OF_AMOUNT,
-} from "./constants.js";
 
 class App {
   #model;
@@ -42,30 +38,18 @@ class App {
     };
     this.submitHandler = {
       "purchase-input-form": () => {
-        const hasManualLottos = this.#model.state.manualLottos.length > 0;
-        const isValidManualLottoNumbers =
-          this.#model.isValidManualLottoNumbers();
-        const isValidAmount = this.#model.isValidAmount(
-          Number(this.#view.$amountInput.value)
-        );
-
-        if (!isValidAmountUnit(this.#view.$amountInput.value)) {
-          alert(MESSAGE_ABOUT_UNIT_OF_AMOUNT);
-          return;
+        try {
+          this.#model.setManualLottos(this.#view.manualLottoList);
+          this.validationCheckForSubmit();
+          this.#model.purchaseLotto(Number(this.#view.$amountInput.value));
+          this.render(this.#model.state);
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            alert(error.message);
+          } else {
+            throw error;
+          }
         }
-
-        if (hasManualLottos && !isValidManualLottoNumbers) {
-          alert(MESSAGE_ABOUT_DUPLICATION_NUMBER);
-          return;
-        }
-
-        if (!isValidAmount) {
-          alert(MESSAGE_ABOUT_ENTERED_OUTSTANDING_AMOUNT);
-          return;
-        }
-
-        this.#model.purchaseLotto(Number(this.#view.$amountInput.value));
-        this.render(this.#model.state);
       },
       "winning-number-confirmation-form": () => {
         const isValidWinningNumbers = this.#model.isValidWinningNumbers(
@@ -87,39 +71,28 @@ class App {
     this.setEvent();
   }
 
-  handledSubmit = (e) => {
+  validationCheckForSubmit() {
+    checkValidAmountUnit(this.#view.$amountInput.value);
+    this.#model.checkValidManualLottoNumbers();
+    this.#model.checkValidAmount(Number(this.#view.$amountInput.value));
+  }
+
+  handledSubmit(e) {
     e.preventDefault();
     if (!isValidSubmitEventTarget(e.target)) return;
     this.submitHandler[e.target.id]();
-  };
+  }
 
-  handledClick = (e) => {
+  handledClick(e) {
     if (!isValidClickEventTarget(e.target)) return;
     e.stopPropagation();
 
     this.clickHandler[e.target.id](e);
-  };
-
-  handledKeyup = (e) => {
-    const { value, parentElement: $parentLiElement, classList } = e.target;
-    const isManualInput = classList.contains("manual-number");
-    const lottoIndex = Number($parentLiElement.getAttribute("index"));
-
-    const numberIndex = Array.from($parentLiElement.children).indexOf(e.target);
-
-    if (!isManualInput) return;
-
-    this.#model.onInputManualLottoNumber({
-      value: Number(value),
-      lottoIndex,
-      numberIndex,
-    });
-  };
+  }
 
   setEvent() {
-    this.$target.addEventListener("submit", this.handledSubmit);
-    this.$target.addEventListener("click", this.handledClick);
-    this.$target.addEventListener("keyup", this.handledKeyup);
+    this.$target.addEventListener("submit", this.handledSubmit.bind(this));
+    this.$target.addEventListener("click", this.handledClick.bind(this));
   }
 
   openModal() {

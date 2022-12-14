@@ -5,11 +5,13 @@ import {
   getMatchedNumberCounts,
   getWinningStatistics,
   getInputValuesWithArray,
+  ValidationError,
 } from "./utils.js";
 import {
   LOTTO_GAME_COUNT,
   MAXIMUM_NUMBER,
   MESSAGE_ABOUT_DUPLICATION_NUMBER,
+  MESSAGE_ABOUT_ENTERED_OUTSTANDING_AMOUNT,
 } from "./constants.js";
 
 const UNIT_AMOUNT = 1000;
@@ -34,10 +36,6 @@ class Lotto {
 
   createManualLotto() {
     this.#state.manualLottos.push([...INITIAL_LOTTO_GAME]);
-  }
-
-  onInputManualLottoNumber({ value, lottoIndex, numberIndex }) {
-    this.#state.manualLottos[lottoIndex][numberIndex] = value;
   }
 
   setLottos(lottos) {
@@ -69,6 +67,16 @@ class Lotto {
     this.setLottos(generatedLottos);
   }
 
+  setManualLottos(manualList) {
+    const manualLottos = Array.from(manualList.children);
+    const manualLottoValues = manualLottos
+      .map(($lotto) =>
+        Array.from($lotto.children).map(($input) => Number($input.value))
+      )
+      .reverse();
+    this.#state.manualLottos = manualLottoValues;
+  }
+
   purchaseLotto(amount) {
     const amountForAutomaticPurchase =
       amount - this.#state.manualLottos.length * UNIT_AMOUNT;
@@ -91,17 +99,24 @@ class Lotto {
     );
   }
 
-  isValidAmount(amount) {
+  checkValidAmount(amount) {
     const amountForAutomaticPurchase =
       amount - this.#state.manualLottos.length * UNIT_AMOUNT;
-    return amountForAutomaticPurchase >= 0;
+
+    if (amountForAutomaticPurchase < 0) {
+      throw new ValidationError(MESSAGE_ABOUT_ENTERED_OUTSTANDING_AMOUNT);
+    }
   }
 
-  isValidManualLottoNumbers() {
-    return (
+  checkValidManualLottoNumbers() {
+    const hasManualLottos = this.state.manualLottos.length > 0;
+    const isValidManualLottoNumbers =
       this.#state.manualLottos.map(hasDuplicatedValueInArray).includes(true) ===
-      false
-    );
+      false;
+
+    if (hasManualLottos && !isValidManualLottoNumbers) {
+      throw new ValidationError(MESSAGE_ABOUT_DUPLICATION_NUMBER);
+    }
   }
 
   isValidWinningNumbers($inputs, $bonusInput) {
